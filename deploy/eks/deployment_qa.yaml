@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  #namespace: qa
+  name: ufl-event-processor
+  labels:
+    app: ufl-event-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ufl-event-processor
+  template:
+    metadata:
+      labels:
+        app: ufl-event-processor
+    spec:
+      containers:
+      - name: processor
+        image: 736790963086.dkr.ecr.us-east-1.amazonaws.com/fanclash-event-processor:latest
+        # This setting makes nodes pull the docker image every time before starting the pod. This is useful when debugging, 
+        # but should be turned off in production.
+        imagePullPolicy: IfNotPresent
+        env:
+            - name: DATABASE_NAME
+              value: "fanclash"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                 name: db-creds
+                 key: DATABASE_USER
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                 name: db-creds
+                 key: DATABASE_PASSWORD
+            - name: DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                 name: db-creds
+                 key: DATABASE_HOST
+            - name: RMQ_HOST
+              value: "rabbitmq-0.rabbitmq-headless.rabbitmq.svc.cluster.local"
+            - name: RMQ_PORT
+              value: "5672"
+            - name: RMQ_VHOST
+              value: "ufl"
+            - name: RMQ_USER
+              valueFrom:
+                secretKeyRef:
+                 name: rabbitmq
+                 key: RMQ_USER
+            - name: RMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                 name: rabbitmq
+                 key: RMQ_PASSWORD
+            - name: RMQ_MATCH_EVENT_EXCHANGE
+              value: "match_event"
+            - name: RMQ_PROCESSOR_QUEUE
+              value: "match_event:processor"
+            - name: RMQ_FCM_EXCHANGE
+              value: "fcm"
+            - name: RMQ_GAMES_EXCHANGE
+              value: "games"
+            - name: RMQ_GAMES_LISTENER_QUEUE
+              value: "games:event_processor"
+            - name: RMQ_SYSTEM_EXCHANGE
+              value: "system"
+            - name: RMQ_SYSTEM_LISTENER_QUEUE
+              value: "system:event_processor"
+            - name: RMQ_GAME_UPDATES_EXCHANGE
+              value: "game_updates"
+        resources:
+          requests:
+            cpu: 10m

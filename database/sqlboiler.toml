@@ -1,0 +1,15 @@
+[aliases.tables.django_celery_beat_periodictasks]
+up_plural     = "DjangoCeleryBeatPeriodicListTasks"
+up_singular   = "DjangoCeleryBeatPeriodicListTask"
+down_plural   = "djangoCeleryBeatPeriodicListTasks"
+down_singular = "djangoCeleryBeatPeriodicListTask"
+
+[psql]
+    dbname = "laliga"
+    host   = "localhost"
+    port   = 5434
+    user   = "laliga"
+    pass   = "laliga"
+    schema = "public"
+    sslmode = "disable"
+    blacklist = ["event_throttler", "data_feed_sim", "pg_stat_statements", "pg_stat_statements_info"]

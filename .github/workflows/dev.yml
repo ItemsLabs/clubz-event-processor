@@ -1,0 +1,73 @@
+name: "[dev] K8S Event Processor Deploy"
+defaults:
+  run:
+    shell: bash
+
+env:
+  DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+  ENV: dev
+  NAMESPACE: fanclash-dev
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  fanclash-event-processor: 
+    name: laliga-matchfantasy-event-processor
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Install doctl 
+        uses: digitalocean/action-doctl@v2
+        with:
+            token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Log in to DO Container Registry 
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Configure Kubectl for DOKS
+        run: doctl kubernetes cluster kubeconfig save dev-fanclash # Replace <your-cluster-name> with your cluster's name
+
+      - name: Build and Push Docker Image
+        run: |
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          DOCKER_IMAGE="laliga-matchfantasy-event-processor:$SHORT_SHA"
+          docker build -t $DOCKER_IMAGE .
+          docker tag $DOCKER_IMAGE registry.digitalocean.com/gameon-ams3/$DOCKER_IMAGE
+          docker push registry.digitalocean.com/gameon-ams3/$DOCKER_IMAGE
+
+      - name: Update Image Tag in K8S Deployment
+        run: |
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          sed -i 's/TAG_PLACEHOLDER/'"$SHORT_SHA"'/g' $GITHUB_WORKSPACE/images/laliga-matchfantasy-event-processor/deployment_${{ env.ENV }}.yaml
+
+      - name: K8S Deploy - Deployment
+        run: kubectl apply -f images/laliga-matchfantasy-event-processor/deployment_${{ env.ENV }}.yaml
+      
+      - name: Check Deployment Health
+        if: success()
+        run: kubectl rollout status deployment/laliga-matchfantasy-event-processor -n $NAMESPACE
+        timeout-minutes: 3
+
+      - name: Rollback Deployment
+        if: failure()
+        run: kubectl rollout undo deployment/laliga-matchfantasy-event-processor -n $NAMESPACE
+        timeout-minutes: 3
+
+      - name: Slack Notification
+        if: always()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: staging-deployments
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_STAGING_URL }}
+          SLACK_ICON_EMOJI: ':gameon:'
+          SLACK_USERNAME: GitHubAction
+          SLACK_COLOR: ${{ job.status }} # Sets the color of the Slack notification bar to red for failures
+          SLACK_TITLE: 'Staging Laliga Event Proccesor K8s deployment. Commit message: ${{ github.event.head_commit.message }}'
+          SLACK_FOOTER: Powered By GameOn DevOps team

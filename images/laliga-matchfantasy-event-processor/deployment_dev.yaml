@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laliga-matchfantasy-event-processor
+  namespace: "fanclash-dev"
+  labels:
+    app: laliga-matchfantasy-event-processor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laliga-matchfantasy-event-processor
+  template:
+    metadata:
+      labels:
+        app: laliga-matchfantasy-event-processor
+    spec:
+      imagePullSecrets:
+      - name: gameon-ams3
+      containers:
+      - name: processor
+        image: registry.digitalocean.com/gameon-ams3/laliga-matchfantasy-event-processor:TAG_PLACEHOLDER
+        imagePullPolicy: IfNotPresent
+        envFrom:
+          - configMapRef:
+              name: fanclash-config
+          - configMapRef:
+              name: rmq-config
+          - configMapRef:
+              name: redis-config
+          - secretRef:
+              name: db-creds
+          - secretRef:
+              name: rmq-creds
+        env:
+          - name: RMQ_MATCH_EVENT_EXCHANGE
+            value: "match_event"
+          - name: RMQ_PROCESSOR_QUEUE
+            value: "match_event:processor"
+          - name: RMQ_FCM_EXCHANGE
+            value: "fcm"
+          - name: RMQ_GAMES_EXCHANGE
+            value: "games"
+          - name: RMQ_GAMES_LISTENER_QUEUE
+            value: "games:event_processor"
+          - name: RMQ_SYSTEM_EXCHANGE
+            value: "system"
+          - name: RMQ_SYSTEM_LISTENER_QUEUE
+            value: "system:event_processor"
+          - name: RMQ_GAME_UPDATES_EXCHANGE
+            value: "game_updates"
+        resources:
+          requests:
+            cpu: 10m
